@@ -1,11 +1,11 @@
-FROM centos:7
+FROM rockylinux:9.3.20231119
 
 MAINTAINER "harman@gmail.com"
 
-RUN sed -i  's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-*  &&  \
-    sed -i  's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g'  /etc/yum.repos.d/CentOS-*
+#RUN sed -i  's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-*  &&  \
+#    sed -i  's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g'  /etc/yum.repos.d/CentOS-*
 
-RUN yum install java-devel net-tool netstat vim bind-utils procps -y
+RUN dnf install java-devel net-tool netstat vim bind-utils procps -y
 
 COPY Dockerfile  /root/
 
