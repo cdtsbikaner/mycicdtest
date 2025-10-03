@@ -31,7 +31,7 @@ pipeline {
 
         stage('Build Docker Image') {
             steps {
-                sh "docker build -t ${DOCKER_REPO}:${IMAGE_TAG} ."
+                sh "docker build -t ${DOCKER_REPO}:${IMAGE_TAG} --no-cache ."
             }
         }
 
