@@ -3,7 +3,7 @@ pipeline {
 
     environment {
         // DockerHub credentials stored in Jenkins as "dockerhub-creds"
-        DOCKERHUB_CREDS = credentials('dockerhub-creds')
+        DOCKERHUB_CREDS = credentials('dockerhub-token')
         // DockerHub repository (change to your repo)
         DOCKER_REPO = "cdtsbikaner/devopstgmay2025"
     }
@@ -53,7 +53,6 @@ pipeline {
                         sh """
                             kubectl apply -f service.yaml
                             kubectl apply -f deployment.yaml
-                            kubectl rollout status deployment/${JOB_NAME}-deployment --timeout=120s
                         """
                     }
                 }
