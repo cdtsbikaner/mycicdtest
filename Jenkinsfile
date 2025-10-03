@@ -3,41 +3,73 @@ pipeline {
 
     environment {
         DOCKER_REPO = "cdtsbikaner/devopstgmay2025"
-        IMAGE_TAG = "latest"
-
-        // Credentials exposed as environment variables
-        GIT_USERNAME = credentials('github-token')  // GitHub username/token
-        DOCKER_USER = credentials('dockerhub-token') // DockerHub username/token
     }
 
     stages {
         stage('Checkout Code') {
             steps {
-                sh 'git clone https://$GIT_USERNAME@github.com/cdtsbikaner/mycicdtest.git'
+                git(
+                    url: 'https://github.com/cdtsbikaner/mycicdtest.git',
+                    credentialsId: 'github-token',
+                    branch: 'master'
+                )
+                // Save Git commit hash in environment variable
+                script {
+                    env.GIT_COMMIT_HASH = sh(
+                        script: "git rev-parse --short HEAD",
+                        returnStdout: true
+                    ).trim()
+                }
             }
         }
 
         stage('Docker Login') {
             steps {
-                sh 'echo $DOCKER_USER | docker login -u $DOCKER_USER --password-stdin'
+                withCredentials([usernamePassword(
+                    credentialsId: 'dockerhub-token',
+                    usernameVariable: 'DOCKER_USER',
+                    passwordVariable: 'DOCKER_PASS'
+                )]) {
+                    sh 'echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin'
+                }
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                sh "docker build -t ${DOCKER_REPO}:${IMAGE_TAG} ."
+                sh """
+                    docker build -t ${DOCKER_REPO}:latest -t ${DOCKER_REPO}:${GIT_COMMIT_HASH} .
+                """
             }
         }
 
         stage('Push Docker Image') {
             steps {
-                sh "docker push ${DOCKER_REPO}:${IMAGE_TAG}"
+                sh """
+                    docker push ${DOCKER_REPO}:latest
+                    docker push ${DOCKER_REPO}:${GIT_COMMIT_HASH}
+                """
+            }
+        }
+
+        stage('Use Kubernetes Secret (optional)') {
+            steps {
+                withCredentials([file(credentialsId: 'k8s-admin-file', variable: 'K8S_CONFIG')]) {
+                    sh 'echo "Kubernetes secret available at $K8S_CONFIG"'
+                    // Example for deployment:
+                    // sh "kubectl --kubeconfig=$K8S_CONFIG apply -f deployment.yaml"
+                }
             }
         }
     }
 
     post {
-        success { echo "✅ Pipeline completed successfully!" }
-        failure { echo "❌ Pipeline failed!" }
+        success {
+            echo "✅ Pipeline completed successfully!"
+            echo "Docker images pushed: ${DOCKER_REPO}:latest and ${DOCKER_REPO}:${GIT_COMMIT_HASH}"
+        }
+        failure {
+            echo "❌ Pipeline failed!"
+        }
     }
 }
