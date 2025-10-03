@@ -2,9 +2,7 @@ pipeline {
     agent any
 
     environment {
-        // DockerHub credentials stored in Jenkins as "dockerhub-creds"
-        DOCKERHUB_CREDS = credentials('dockerhub-token')
-        // DockerHub repository (change to your repo)
+        // DockerHub repository (change if needed)
         DOCKER_REPO = "cdtsbikaner/devopstgmay2025"
     }
 
@@ -22,13 +20,16 @@ pipeline {
                 script {
                     def imageTag = "${DOCKER_REPO}:${JOB_NAME}-${BUILD_NUMBER}"
 
-                    echo "Building Docker image: ${imageTag}"
-
-                    sh """
-                        docker build -t ${imageTag} --no-cache .
-                        echo ${DOCKERHUB_CREDS_PSW} | docker login -u ${DOCKERHUB_CREDS_USR} --password-stdin
-                        docker push ${imageTag}
-                    """
+                    withCredentials([usernamePassword(credentialsId: 'dockerhub-token',
+                                                      usernameVariable: 'USER',
+                                                      passwordVariable: 'PASS')]) {
+                        sh """
+                            echo "Building Docker image: ${imageTag}"
+                            docker build -t ${imageTag} --no-cache .
+                            echo $PASS | docker login -u $USER --password-stdin
+                            docker push ${imageTag}
+                        """
+                    }
                 }
             }
         }
@@ -36,7 +37,7 @@ pipeline {
         stage('Update Deployment File') {
             steps {
                 script {
-                    echo "Updating Kubernetes manifest with JobName=${JOB_NAME}, BuildNumber=${BUILD_NUMBER}"
+                    echo "Updating deployment.yaml with JobName=${JOB_NAME}, BuildNumber=${BUILD_NUMBER}"
 
                     sh """
                         sed -i "s/BUILD_NUMBER/${BUILD_NUMBER}/g" deployment.yaml
@@ -49,10 +50,12 @@ pipeline {
         stage('Deploy to Kubernetes') {
             steps {
                 script {
-                    withKubeConfig([credentialsId: 'k8s-admin-file', serverUrl: 'https://172.31.86.126:6443']) {
+                    withKubeConfig([credentialsId: 'k8s-admin-file',
+                                    serverUrl: 'https://172.31.86.126:6443']) {
                         sh """
                             kubectl apply -f service.yaml
                             kubectl apply -f deployment.yaml
+                            kubectl rollout status deployment/${JOB_NAME}-deployment --timeout=120s
                         """
                     }
                 }
